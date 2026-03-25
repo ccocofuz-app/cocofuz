@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>COCOFUZ Business Tracker</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        ::-webkit-scrollbar { height: 6px; width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #10b981; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #059669; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-900">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // --- FIREBASE SETUP ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCBvtj42uBZDY2jdLCuOvMwVUWbDZzT5LU",
+            authDomain: "cocofuz-3d9f2.firebaseapp.com",
+            projectId: "cocofuz-3d9f2",
+            storageBucket: "cocofuz-3d9f2.firebasestorage.app",
+            messagingSenderId: "279016644214",
+            appId: "1:279016644214:web:f887520d1f7f4168fd8957",
+            measurementId: "G-4260QH950N"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const googleProvider = new firebase.auth.GoogleAuthProvider();
+        // ----------------------
+
+        // --- LOGIN & SIGNUP COMPONENT ---
+        const LoginScreen = () => {
+            const [isSignUp, setIsSignUp] = useState(false);
+            const [name, setName] = useState('');
+            const [mobile, setMobile] = useState('');
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+
+            const handleGoogleLogin = async () => {
+                setIsLoading(true); setError('');
+                try { await auth.signInWithPopup(googleProvider); } 
+                catch (err) { setError(err.message); setIsLoading(false); }
+            };
+
+            const handleEmailAuth = async (e) => {
+                e.preventDefault();
+                setIsLoading(true); setError('');
+                try {
+                    if (isSignUp) {
+                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                        await userCredential.user.updateProfile({ displayName: name });
+                        await db.collection("users").doc(userCredential.user.uid).set({
+                            name: name,
+                            email: email,
+                            mobile: mobile,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        await auth.signInWithEmailAndPassword(email, password);
+                    }
+                } catch (err) {
+                    setError(err.message);
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-fade-in">
+                        <div className="flex flex-col items-center mb-6">
+                            <div className="relative w-20 h-20 mb-4 bg-white rounded-full">
+                               <img src="logo.jpg" alt="COCOFUZ Logo" className="w-full h-full object-cover rounded-full shadow-xl border-4 border-emerald-100" onError={(e) => { e.target.style.display = 'none'; document.getElementById('fallback-logo-login').style.display = 'flex'; }} />
+                               <div id="fallback-logo-login" className="hidden absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center shadow-xl"><i className="fa-solid fa-droplet text-white text-3xl"></i></div>
+                            </div>
+                            <h1 className="text-2xl font-black text-emerald-800 tracking-tight">COCOFUZ</h1>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{isSignUp ? 'Create Account' : 'Business Portal'}</p>
+                        </div>
+                        
+                        {error && <div className="bg-red-50 text-red-600 p-3 mb-4 rounded-xl text-sm text-center font-semibold border border-red-200"><i className="fa-solid fa-circle-exclamation mr-2"></i> {error}</div>}
+                        
+                        <form onSubmit={handleEmailAuth} className="space-y-4">
+                            {isSignUp && (
+                                <>
+                                    <div className="relative">
+                                        <i className="fa-solid fa-user absolute left-4 top-3.5 text-gray-400"></i>
+                                        <input type="text" value={name} onChange={e => setName(e.target.value)} required className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition text-sm" placeholder="Full Name" />
+                                    </div>
+                                    <div className="relative">
+                                        <i className="fa-solid fa-phone absolute left-4 top-3.5 text-gray-400"></i>
+                                        <input type="tel" value={mobile} onChange={e => setMobile(e.target.value)} required className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition text-sm" placeholder="Mobile Number" />
+                                    </div>
+                                </>
+                            )}
+                            <div className="relative">
+                                <i className="fa-solid fa-envelope absolute left-4 top-3.5 text-gray-400"></i>
+                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition text-sm" placeholder="Email Address" />
+                            </div>
+                            <div className="relative">
+                                <i className="fa-solid fa-lock absolute left-4 top-3.5 text-gray-400"></i>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition text-sm" placeholder="Password (min 6 chars)" />
+                            </div>
+                            
+                            <button type="submit" disabled={isLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition shadow-lg shadow-emerald-200 mt-2 flex justify-center items-center disabled:opacity-70">
+                                {isLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : (isSignUp ? 'Create Account' : 'Secure Login')}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 flex items-center justify-center space-x-4">
+                            <hr className="w-full border-gray-200" />
+                            <span className="text-xs font-bold text-gray-400 uppercase">OR</span>
+                            <hr className="w-full border-gray-200" />
+                        </div>
+
+                        <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full mt-6 bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-3 px-4 rounded-xl transition flex items-center justify-center text-sm disabled:opacity-70">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 mr-3" alt="Google logo" /> Sign in with Google
+                        </button>
+
+                        <p className="text-center text-sm text-gray-500 mt-6">
+                            {isSignUp ? "Already have an account?" : "Don't have an account?"} 
+                            <button onClick={() => { setIsSignUp(!isSignUp); setError(''); }} className="text-emerald-600 font-bold ml-2 hover:underline">
+                                {isSignUp ? "Login here" : "Sign up"}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+            const [currentUser, setCurrentUser] = useState(null);
+            
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+            const [dashboardMonth, setDashboardMonth] = useState(new Date().toISOString().substring(0, 7));
+            
+            // --- DATE RANGE STATES FOR REPORTS (Default to current month to today) ---
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            const [reportFromDate, setReportFromDate] = useState(firstDayOfMonth.toISOString().split('T')[0]);
+            const [reportToDate, setReportToDate] = useState(today.toISOString().split('T')[0]);
+
+            // --- FULLY CLOUD-SYNCED DATA STATES ---
+            const [purchases, setPurchases] = useState([]);
+            const [production, setProduction] = useState([]); 
+            const [transfers, setTransfers] = useState([]);
+            const [sales, setSales] = useState([]); 
+            const [expenses, setExpenses] = useState([]);
+            const [assets, setAssets] = useState([]); 
+            const [payments, setPayments] = useState([]); 
+            
+            const [monthlyTarget, setMonthlyTarget] = useState(150000); 
+            const [isEditingTarget, setIsEditingTarget] = useState(false);
+            const [tempTargetValue, setTempTargetValue] = useState("");
+
+            const [saleEntry, setSaleEntry] = useState({ date: new Date().toISOString().split('T')[0], soldQty: '', saleValue: '', commission: '' });
+            const [paymentEntry, setPaymentEntry] = useState({ date: new Date().toISOString().split('T')[0], month: new Date().toISOString().substring(0, 7), saleQty: '', totalAmount: '', netSale: '', receivedAmount: '', notes: '' });
+
+            const [aiInsights, setAiInsights] = useState(null);
+            const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+            const [marketingCopy, setMarketingCopy] = useState(null);
+            const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
+            const [negotiationDraft, setNegotiationDraft] = useState("");
+            const [isGeneratingNegotiation, setIsGeneratingNegotiation] = useState(false);
+            const [expenseAudit, setExpenseAudit] = useState("");
+            const [isGeneratingAudit, setIsGeneratingAudit] = useState(false);
+            const [salesCoachTip, setSalesCoachTip] = useState("");
+            const [isGeneratingSalesCoach, setIsGeneratingSalesCoach] = useState(false);
+            const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+
+            // --- 1. FIREBASE AUTHENTICATION LISTENER ---
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    if (user) {
+                        setCurrentUser(user);
+                        setIsLoggedIn(true);
+                    } else {
+                        setCurrentUser(null);
+                        setIsLoggedIn(false);
+                    }
+                    setIsCheckingAuth(false);
+                });
+                return () => unsubscribe(); 
+            }, []);
+
+            // --- 2. FIREBASE REAL-TIME CLOUD LISTENERS (SYNC EVERYTHING) ---
+            useEffect(() => {
+                if (!isLoggedIn) return;
+
+                const syncCollection = (collectionName, stateSetter) => {
+                    return db.collection(collectionName)
+                             .orderBy("timestamp", "desc")
+                             .onSnapshot((snapshot) => {
+                                 const data = [];
+                                 snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+                                 stateSetter(data);
+                             }, (err) => console.error(`Error syncing ${collectionName}:`, err));
+                };
+
+                const unsubSales = syncCollection("sales", setSales);
+                const unsubPurchases = syncCollection("purchases", setPurchases);
+                const unsubProduction = syncCollection("production", setProduction);
+                const unsubTransfers = syncCollection("transfers", setTransfers);
+                const unsubExpenses = syncCollection("expenses", setExpenses);
+                const unsubAssets = syncCollection("assets", setAssets);
+                const unsubPayments = syncCollection("payments", setPayments);
+
+                return () => {
+                    unsubSales(); unsubPurchases(); unsubProduction();
+                    unsubTransfers(); unsubExpenses(); unsubAssets(); unsubPayments();
+                };
+            }, [isLoggedIn]);
+
+            const handleLogout = () => auth.signOut().catch(error => console.error("Error signing out: ", error));
+
+            // --- GLOBAL CLOUD DELETE FUNCTION ---
+            const deleteFromCloud = async (collectionName, id) => {
+                try { await db.collection(collectionName).doc(id).delete(); } 
+                catch (error) { alert("Failed to delete from cloud."); }
+            };
+
+            // --- INPUT HANDLERS WITH AUTOMATIC FORMULAS ---
+            const handleSaleQtyChange = (e) => {
+                const qty = e.target.value;
+                const qtyNum = Number(qty);
+                // Automatically calculate gross sale (Qty * 100) and commission (Qty * 25)
+                setSaleEntry({ 
+                    ...saleEntry, 
+                    soldQty: qty, 
+                    saleValue: qtyNum > 0 ? qtyNum * 100 : '', 
+                    commission: qtyNum > 0 ? qtyNum * 25 : '' 
+                });
+            };
+            
+            const handleSaleInputChange = (e) => setSaleEntry({ ...saleEntry, [e.target.name]: e.target.value });
+
+            // --- CLOUD ADD FUNCTIONS ---
+            const handleAddSale = async (e) => {
+                e.preventDefault();
+                const newSale = { 
+                    date: saleEntry.date, 
+                    soldQty: Number(saleEntry.soldQty), 
+                    saleValue: Number(saleEntry.saleValue), 
+                    commission: Number(saleEntry.commission) || 0,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    userEmail: currentUser?.email || currentUser?.displayName
+                };
+                try {
+                    await db.collection("sales").add(newSale);
+                    setSaleEntry({ date: new Date().toISOString().split('T')[0], soldQty: '', saleValue: '', commission: '' });
+                } catch (err) { alert("Failed to save. Check internet connection."); }
+            };
+
+            const handleAddPurchase = async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const qty = Number(formData.get('quantity'));
+              const rate = Number(formData.get('rate'));
+              const transport = Number(formData.get('transportCost')) || 0;
+              const totalCost = (qty * rate) + transport;
+              const landingPrice = (totalCost / qty).toFixed(2);
+              try {
+                  await db.collection("purchases").add({
+                      date: formData.get('date'), supplier: formData.get('supplier'), quantity: qty,
+                      rate: rate, transportCost: transport, totalCost: totalCost, landingPrice: Number(landingPrice),
+                      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                  });
+                  e.target.reset();
+              } catch (err) { alert("Failed to save to cloud."); }
+            };
+
+            const handleAddProduction = async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              try {
+                  await db.collection("production").add({
+                      date: formData.get('date'), raw: Number(formData.get('raw')), peeled: Number(formData.get('peeled')),
+                      waste: Number(formData.get('waste')), notes: formData.get('notes'), timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                  });
+                  e.target.reset();
+              } catch (err) { alert("Failed to log production."); }
+            };
+
+            const handleAddTransfer = async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              try {
+                  await db.collection("transfers").add({
+                      date: formData.get('date'), destination: formData.get('destination'),
+                      quantity: Number(formData.get('quantity')), transportCost: Number(formData.get('transportCost') || 0),
+                      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                  });
+                  e.target.reset();
+              } catch (err) { alert("Failed to log transfer."); }
+            };
+
+            const handleAddExpense = async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              try {
+                  await db.collection("expenses").add({
+                      date: formData.get('date'), category: formData.get('category'),
+                      amount: Number(formData.get('amount')), notes: formData.get('notes'),
+                      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                  });
+                  e.target.reset();
+              } catch (err) { alert("Failed to save expense."); }
+            };
+
+            const handleAddAsset = async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              try {
+                  await db.collection("assets").add({
+                      date: formData.get('date'), name: formData.get('name'),
+                      cost: Number(formData.get('cost')), supplier: formData.get('supplier'),
+                      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                  });
+                  e.target.reset();
+              } catch (err) { alert("Failed to save asset."); }
+            };
+
+            const handlePaymentQtyChange = (e) => {
+              const qtyNum = Number(e.target.value);
+              const totalAmount = qtyNum > 0 ? qtyNum * 100 : '';
+              const netSale = qtyNum > 0 ? totalAmount * 0.75 : ''; 
+              setPaymentEntry({ ...paymentEntry, saleQty: e.target.value, totalAmount: totalAmount, netSale: netSale });
+            };
+
+            const handlePaymentInputChange = (e) => setPaymentEntry({ ...paymentEntry, [e.target.name]: e.target.value });
+
+            const handleAddPayment = async (e) => {
+              e.preventDefault();
+              const total = Number(paymentEntry.totalAmount);
+              const net = Number(paymentEntry.netSale);
+              const received = Number(paymentEntry.receivedAmount);
+              try {
+                  await db.collection("payments").add({
+                      date: paymentEntry.date, month: paymentEntry.month, saleQty: Number(paymentEntry.saleQty),
+                      totalAmount: total, netSale: net, receivedAmount: received, pendingAmount: total - received,
+                      notes: paymentEntry.notes, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                  });
+                  setPaymentEntry({ date: new Date().toISOString().split('T')[0], month: new Date().toISOString().substring(0, 7), saleQty: '', totalAmount: '', netSale: '', receivedAmount: '', notes: '' });
+              } catch (err) { alert("Failed to save payment status."); }
+            };
+
+            // --- CALCULATIONS (MONTHLY FILTERING LOGIC) ---
+            const stats = useMemo(() => {
+              const totalPurchased = purchases.reduce((sum, p) => sum + p.quantity, 0);
+              const totalTransferred = transfers.reduce((sum, t) => sum + t.quantity, 0);
+              const totalSold = sales.reduce((sum, s) => sum + s.soldQty, 0);
+              
+              const godownStock = totalPurchased - totalTransferred;
+              const storeStock = totalTransferred - totalSold;
+
+              const totalStockCost = purchases.reduce((sum, p) => sum + p.totalCost, 0);
+              const totalGodownTransportCost = purchases.reduce((sum, p) => sum + p.transportCost, 0);
+
+              const monthlySalesList = sales.filter(s => s.date && s.date.startsWith(dashboardMonth));
+              const selectedMonthGrossSale = monthlySalesList.reduce((sum, s) => sum + s.saleValue, 0);
+              
+              // Total sold in selected month
+              const totalSoldInMonth = monthlySalesList.reduce((sum, s) => sum + s.soldQty, 0);
+
+              const dailySalesMap = {};
+              monthlySalesList.forEach(s => {
+                const safeDate = s.date;
+                if (!dailySalesMap[safeDate]) { dailySalesMap[safeDate] = { date: safeDate, qty: 0, value: 0, commission: 0 }; }
+                dailySalesMap[safeDate].qty += s.soldQty;
+                dailySalesMap[safeDate].value += s.saleValue;
+                dailySalesMap[safeDate].commission += (s.commission || 0);
+              });
+              
+              const filteredDayWiseSales = Object.values(dailySalesMap).map(d => ({ ...d, netSale: d.value - d.commission })).sort((a, b) => b.date.localeCompare(a.date));
+
+              let dayHigh = { qty: 0, date: '-' };
+              let dayLow = { qty: 0, date: '-' };
+              
+              if (filteredDayWiseSales.length > 0) {
+                dayHigh = filteredDayWiseSales.reduce((max, current) => current.qty > max.qty ? current : max, filteredDayWiseSales[0]);
+                dayLow = filteredDayWiseSales.reduce((min, current) => current.qty < min.qty ? current : min, filteredDayWiseSales[0]);
+              }
+
+              const avgDailySales = filteredDayWiseSales.length ? Math.round(totalSoldInMonth / filteredDayWiseSales.length) : 0;
+
+              const monthlyData = {};
+              const initMonth = (dateStr) => {
+                  if (!dateStr) return 'Unknown';
+                  const month = dateStr.substring(0, 7);
+                  if (!monthlyData[month]) { monthlyData[month] = { month, grossSale: 0, commission: 0, expenses: 0 }; }
+                  return month;
+              };
+
+              sales.forEach(s => { const m = initMonth(s.date); if (m !== 'Unknown') { monthlyData[m].grossSale += s.saleValue; monthlyData[m].commission += (s.commission || 0); }});
+              expenses.forEach(e => { const m = initMonth(e.date); if (m !== 'Unknown') monthlyData[m].expenses += e.amount; });
+              purchases.forEach(p => { const m = initMonth(p.date); if (m !== 'Unknown') monthlyData[m].expenses += p.totalCost; });
+              transfers.forEach(t => { const m = initMonth(t.date); if (m !== 'Unknown') monthlyData[m].expenses += t.transportCost; });
+
+              const monthlyReport = Object.values(monthlyData).map(data => {
+                  const netSale = data.grossSale - data.commission;
+                  const netProfit = netSale - data.expenses;
+                  return { ...data, netSale, netProfit };
+              }).sort((a, b) => b.month.localeCompare(a.month));
+
+              const targetAchievedPercent = monthlyTarget > 0 ? Math.min(100, Math.round((selectedMonthGrossSale / monthlyTarget) * 100)) : 0;
+
+              return { 
+                godownStock, storeStock, totalStockCost, totalGodownTransportCost,
+                selectedMonthGrossSale, targetAchievedPercent, totalSoldInMonth,
+                avgDailySales, dayHigh, dayLow, filteredDayWiseSales, 
+                monthlyReport
+              };
+            }, [purchases, transfers, sales, expenses, assets, monthlyTarget, dashboardMonth]);
+
+            const handleDownloadPDF = () => {
+                setIsPdfGenerating(true);
+                const element = document.getElementById('pdf-report-content');
+                const opt = { margin: 0.4, filename: `COCOFUZ_Report_${dashboardMonth}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+                html2pdf().set(opt).from(element).save().then(() => setIsPdfGenerating(false));
+            };
+
+            const callGeminiAPI = async (prompt, systemInstruction) => {
+              const apiKey = "YOUR_GEMINI_API_KEY_HERE"; 
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+              const payload = { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: systemInstruction }] } };
+              const attemptFetch = async (retries = 3, delay = 1000) => {
+                try {
+                  const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                  if (!response.ok) throw new Error(`API Error`);
+                  const data = await response.json();
+                  return data.candidates?.[0]?.content?.parts?.[0]?.text || "No insights generated.";
+                } catch (error) {
+                  if (retries > 0) { await new Promise(resolve => setTimeout(resolve, delay)); return attemptFetch(retries - 1, delay * 2); }
+                  throw new Error("Failed to connect to AI.");
+                }
+              };
+              return attemptFetch();
+            };
+
+            const handleGenerateInsights = async () => {
+              setIsGeneratingInsights(true);
+              try {
+                const prompt = `Analyze COCOFUZ tender coconut data for the month of ${dashboardMonth}:\n- Godown Stock: ${stats.godownStock}\n- Store Stock: ${stats.storeStock}\n- Avg Daily Sales This Month: ${stats.avgDailySales}/day\n- Month Gross Revenue: ₹${stats.selectedMonthGrossSale} against Target ₹${monthlyTarget} (${stats.targetAchievedPercent}%)\nProvide exactly 3 short, highly actionable bullet points of business advice. Keep it under 80 words.`;
+                const response = await callGeminiAPI(prompt, "You are a sharp retail business consultant helping a coconut brand owner optimize their operations.");
+                setAiInsights(response);
+              } catch (error) { setAiInsights("Failed to generate insights."); }
+              setIsGeneratingInsights(false);
+            };
+
+            const handleGenerateMarketing = async (e) => {
+              e.preventDefault();
+              setIsGeneratingCopy(true);
+              try {
+                const topic = new FormData(e.target).get('topic');
+                const prompt = `Write a catchy social media post for Instagram/Facebook about: "${topic}". Our business is COCOFUZ, a premium tender coconut brand. Include emojis and hashtags.`;
+                const response = await callGeminiAPI(prompt, "You are a creative social media manager.");
+                setMarketingCopy(response);
+              } catch (error) { setMarketingCopy("Failed to generate copy."); }
+              setIsGeneratingCopy(false);
+            };
+
+            const handleGenerateNegotiation = async () => {
+              if (purchases.length === 0) { setNegotiationDraft("⚠️ Please add at least one stock purchase first."); return; }
+              setIsGeneratingNegotiation(true);
+              const latest = purchases[0]; 
+              const prompt = `Write a polite but firm WhatsApp message to my tender coconut supplier named "${latest.supplier}". I recently bought ${latest.quantity} coconuts at ₹${latest.rate}/pc, plus ₹${latest.transportCost} for transport (Landing price: ₹${latest.landingPrice}). Negotiate for a better rate or free transport for the next bulk order. Keep it short, use some emojis.`;
+              try {
+                const res = await callGeminiAPI(prompt, "You are a tough but professional business owner negotiating with a supplier.");
+                setNegotiationDraft(res);
+              } catch (e) { setNegotiationDraft("Failed to generate."); }
+              setIsGeneratingNegotiation(false);
+            };
+
+            const handleAuditExpenses = async () => {
+              if (expenses.length === 0) { setExpenseAudit("⚠️ Please add some expenses before running an audit."); return; }
+              setIsGeneratingAudit(true);
+              const expList = expenses.map(e => `${e.date} - ${e.category}: ₹${e.amount}`).join('\n');
+              const prompt = `Review these recent business expenses for my coconut stall:\n${expList}\nIdentify where I am spending the most and suggest 2 practical ways to reduce these costs.`;
+              try {
+                const res = await callGeminiAPI(prompt, "You are a strict financial advisor helping a small business cut costs.");
+                setExpenseAudit(res);
+              } catch (e) { setExpenseAudit("Failed to generate."); }
+              setIsGeneratingAudit(false);
+            };
+
+            const handleGenerateSalesCoach = async () => {
+              setIsGeneratingSalesCoach(true);
+              const prompt = `My COCOFUZ coconut stall's average daily sales are ${stats.avgDailySales} pcs, and my best day was ${stats.dayHigh.qty} pcs. Give me 2 quick, practical upselling techniques or bundle deal ideas I can try today at my store/airport stall to beat my record. Keep it short and actionable.`;
+              try {
+                const res = await callGeminiAPI(prompt, "You are a top retail sales coach helping a coconut vendor increase daily volume.");
+                setSalesCoachTip(res);
+              } catch (e) { setSalesCoachTip("Failed to generate."); }
+              setIsGeneratingSalesCoach(false);
+            };
+
+            const handleGenerateChalkboard = async () => {
+              setIsGeneratingChalkboard(true);
+              const prompt = `Write a short, punchy, 1-sentence hook or health fact about tender coconuts. I will write this on the physical chalkboard at my COCOFUZ stall to attract people walking by. Make it catchy, fun, and under 15 words.`;
+              try {
+                const res = await callGeminiAPI(prompt, "You are an expert copywriter for retail storefronts.");
+                setChalkboardHook(res);
+              } catch (e) { setChalkboardHook("Failed to generate."); }
+              setIsGeneratingChalkboard(false);
+            };
+
+            const NavItem = ({ id, iconClass, label }) => (
+              <button onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === id ? 'bg-emerald-600 text-white shadow-md' : 'text-emerald-800 hover:bg-emerald-100'}`}>
+                <i className={`fa-fw ${iconClass}`}></i><span className="font-medium">{label}</span>
+              </button>
+            );
+
+            const StatCard = ({ title, value, subtitle, iconClass, colorClass = "emerald" }) => {
+              const bgColors = { emerald: "bg-emerald-100 text-emerald-600", blue: "bg-blue-100 text-blue-600", orange: "bg-orange-100 text-orange-600", red: "bg-red-100 text-red-600", purple: "bg-purple-100 text-purple-600" };
+              return (
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">{title}</p>
+                    <h3 className="text-xl md:text-2xl font-black text-gray-800">{value}</h3>
+                    {subtitle && <p className="text-xs text-gray-500 mt-1 font-medium">{subtitle}</p>}
+                  </div>
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-xl text-lg ${bgColors[colorClass]}`}><i className={iconClass}></i></div>
+                </div>
+              );
+            };
+
+            const getMonthName = (dateString) => {
+              if (!dateString || dateString === '-') return '-';
+              const parts = dateString.split('-');
+              if (parts.length < 2) return dateString;
+              return new Date(parts[0], parts[1] - 1).toLocaleString('default', { month: 'short', year: 'numeric' });
+            };
+
+            const formatDate = (dateStr) => {
+              if (!dateStr || dateStr === '-') return '-';
+              try { return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return dateStr; }
+            };
+
+            // Loading state while checking auth
+            if (isCheckingAuth) return <div className="min-h-screen bg-emerald-900 flex items-center justify-center text-white"><i className="fa-solid fa-spinner fa-spin text-4xl"></i></div>;
+            
+            if (!isLoggedIn) return <LoginScreen />;
+
+            const userDisplayName = currentUser?.displayName || currentUser?.email || "User";
+
+            return (
+              <div className="min-h-screen bg-gray-50 flex">
+                <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 fixed h-full z-10">
+                  <div className="p-6 flex flex-col items-center justify-center border-b border-gray-100">
+                    <div className="relative w-20 h-20 mb-3 bg-white rounded-full">
+                       <img src="logo.jpg" alt="COCOFUZ Logo" className="w-full h-full object-cover rounded-full shadow-md border-2 border-emerald-100" onError={(e) => { e.target.style.display = 'none'; document.getElementById('fallback-logo-desktop').style.display = 'flex'; }} />
+                       <div id="fallback-logo-desktop" className="hidden absolute inset-0 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center shadow-md"><i className="fa-solid fa-droplet text-white text-2xl"></i></div>
+                    </div>
+                    <h1 className="text-2xl font-black text-emerald-800 tracking-tight">COCOFUZ</h1>
+                    <p className="text-xs text-gray-500 mt-2 font-bold truncate w-full text-center"><i className="fa-regular fa-user mr-1"></i> {userDisplayName}</p>
+                  </div>
+                  <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                    <NavItem id="dashboard" iconClass="fa-solid fa-chart-pie" label="Profit Dashboard" />
+                    <NavItem id="reports" iconClass="fa-solid fa-file-export" label="Custom Reports" />
+                    <NavItem id="supply" iconClass="fa-solid fa-warehouse" label="Supply & Production" />
+                    <NavItem id="operations" iconClass="fa-solid fa-truck" label="Store Operations" />
+                    <NavItem id="finance" iconClass="fa-solid fa-file-invoice-dollar" label="Finance & Assets" />
+                    <NavItem id="marketing" iconClass="fa-solid fa-wand-magic-sparkles" label="AI Marketing ✨" />
+                  </nav>
+                  <div className="p-4 border-t border-gray-100">
+                    <button onClick={handleLogout} className="w-full py-2 text-sm font-bold text-red-500 hover:bg-red-50 rounded-lg transition"><i className="fa-solid fa-arrow-right-from-bracket mr-2"></i>Logout</button>
+                  </div>
+                </aside>
+
+                <div className="md:hidden fixed top-0 w-full bg-white border-b border-gray-200 z-50 px-4 py-3 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center space-x-2">
+                     <img src="logo.jpg" alt="Logo" className="w-8 h-8 object-cover rounded-full bg-white" onError={(e) => { e.target.style.display = 'none'; }} />
+                    <h1 className="text-xl font-black text-emerald-800">COCOFUZ</h1>
+                  </div>
+                  <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-emerald-800 p-2 text-xl"><i className={isMobileMenuOpen ? "fa-solid fa-xmark" : "fa-solid fa-bars"}></i></button>
+                </div>
+
+                {isMobileMenuOpen && (
+                  <div className="md:hidden fixed inset-0 top-14 bg-white z-40 p-4 space-y-2 border-b border-gray-200 shadow-xl overflow-y-auto pb-20">
+                    <div className="mb-4 pb-4 border-b border-gray-100 text-center">
+                        <p className="text-sm text-gray-500 font-bold truncate w-full"><i className="fa-regular fa-user mr-1"></i> {userDisplayName}</p>
+                    </div>
+                    <NavItem id="dashboard" iconClass="fa-solid fa-chart-pie" label="Profit Dashboard" />
+                    <NavItem id="reports" iconClass="fa-solid fa-file-export" label="Custom Reports" />
+                    <NavItem id="supply" iconClass="fa-solid fa-warehouse" label="Supply & Production" />
+                    <NavItem id="operations" iconClass="fa-solid fa-truck" label="Store Operations" />
+                    <NavItem id="finance" iconClass="fa-solid fa-file-invoice-dollar" label="Finance & Assets" />
+                    <NavItem id="marketing" iconClass="fa-solid fa-wand-magic-sparkles" label="AI Marketing ✨" />
+                    <button onClick={handleLogout} className="w-full mt-4 py-3 text-sm font-bold text-red-500 bg-red-50 rounded-xl transition"><i className="fa-solid fa-arrow-right-from-bracket mr-2"></i>Logout</button>
+                  </div>
+                )}
+
+                <main className="flex-1 md:ml-64 pt-20 md:pt-0 p-4 md:p-8 w-full max-w-6xl mx-auto">
+                  
+                  {/* DASHBOARD */}
+                  {activeTab === 'dashboard' && (
+                    <div className="space-y-6 animate-fade-in" id="pdf-report-content">
+                      
+                      <header className="mb-6 flex flex-col md:flex-row justify-between md:items-end gap-4">
+                        <div>
+                          <h2 className="text-3xl font-bold text-gray-800">Profit Dashboard</h2>
+                          <p className="text-gray-500">Overview for <strong className="text-emerald-700">{getMonthName(dashboardMonth)}</strong></p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                           <div className="bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm flex items-center w-full sm:w-auto" data-html2canvas-ignore>
+                               <i className="fa-regular fa-calendar text-emerald-600 mr-2"></i>
+                               <input type="month" value={dashboardMonth} onChange={(e) => setDashboardMonth(e.target.value)} className="outline-none text-gray-700 font-bold bg-transparent cursor-pointer w-full" />
+                           </div>
+                           <button onClick={handleDownloadPDF} disabled={isPdfGenerating} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-5 rounded-xl shadow-md transition disabled:opacity-70 flex items-center justify-center" data-html2canvas-ignore>
+                             {isPdfGenerating ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-file-pdf mr-2"></i>} 
+                             {isPdfGenerating ? 'Generating...' : 'Download PDF'}
+                           </button>
+                        </div>
+                      </header>
+
+                      {/* TARGET TRACKER */}
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+                         <div className="w-full md:w-auto">
+                            <h3 className="text-sm font-bold text-emerald-600 uppercase tracking-widest mb-1"><i className="fa-solid fa-bullseye mr-2"></i> {getMonthName(dashboardMonth)} Target</h3>
+                            <div className="flex items-end gap-2">
+                                <h4 className="text-3xl font-black text-gray-800">₹{stats.selectedMonthGrossSale.toLocaleString()}</h4>
+                                {isEditingTarget ? (
+                                    <div className="flex items-center gap-2 mb-1" data-html2canvas-ignore>
+                                        <span className="text-gray-500 font-medium">/ ₹</span>
+                                        <input type="number" value={tempTargetValue} onChange={e => setTempTargetValue(e.target.value)} className="w-24 border-b-2 border-emerald-500 outline-none text-gray-700 font-bold bg-transparent px-1" autoFocus />
+                                        <button onClick={() => { if(tempTargetValue && !isNaN(tempTargetValue)) { setMonthlyTarget(Number(tempTargetValue)); } setIsEditingTarget(false); }} className="text-emerald-600 bg-emerald-50 p-1 rounded hover:bg-emerald-100"><i className="fa-solid fa-check"></i></button>
+                                        <button onClick={() => setIsEditingTarget(false)} className="text-red-500 bg-red-50 p-1 rounded hover:bg-red-100"><i className="fa-solid fa-xmark"></i></button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <p className="text-gray-500 font-medium">/ ₹{monthlyTarget.toLocaleString()}</p>
+                                        <button onClick={() => { setTempTargetValue(monthlyTarget); setIsEditingTarget(true); }} className="text-gray-400 hover:text-emerald-600 transition" data-html2canvas-ignore><i className="fa-solid fa-pen-to-square"></i></button>
+                                    </div>
+                                )}
+                            </div>
+                         </div>
+                         <div className="w-full md:w-1/2">
+                             <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+                                 <span>{stats.targetAchievedPercent}% Achieved</span>
+                                 <span>100%</span>
+                             </div>
+                             <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
+                                <div className="bg-emerald-500 h-4 rounded-full transition-all duration-1000" style={{width: `${stats.targetAchievedPercent}%`}}></div>
+                             </div>
+                         </div>
+                      </div>
+
+                      <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 border-b pb-2 flex items-center"><i className="fa-solid fa-arrow-trend-up mr-2 text-blue-600"></i> Daily Performance ({getMonthName(dashboardMonth)})</h3>
+                      
+                      {/* Total Sold Qty block here */}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <StatCard title="Total Sold" value={`${stats.totalSoldInMonth} pcs`} subtitle="This month" iconClass="fa-solid fa-box-open" colorClass="purple" />
+                        <StatCard title="Avg Daily" value={`${stats.avgDailySales} pcs`} subtitle="Per active day" iconClass="fa-solid fa-arrow-trend-up" colorClass="blue" />
+                        <StatCard title="Day High" value={`${stats.dayHigh.qty} pcs`} subtitle={stats.dayHigh.date !== '-' ? `${formatDate(stats.dayHigh.date)}` : 'No sales yet'} iconClass="fa-solid fa-arrow-trend-up" colorClass="emerald" />
+                        <StatCard title="Day Low" value={`${stats.dayLow.qty} pcs`} subtitle={stats.dayLow.date !== '-' ? `${formatDate(stats.dayLow.date)}` : 'No sales yet'} iconClass="fa-solid fa-arrow-trend-down" colorClass="red" />
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 border-b pb-2 flex items-center"><i className="fa-regular fa-calendar-days mr-2 text-blue-600"></i> Month-Wise P & L (All Time)</h3>
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                              <table className="w-full text-left border-collapse min-w-max">
+                                <thead className="sticky top-0 bg-blue-50 z-10">
+                                  <tr className="text-blue-900 text-xs uppercase tracking-wider"><th className="p-3 font-bold">Month</th><th className="p-3 font-semibold text-gray-600">Gross Sale</th><th className="p-3 font-semibold text-orange-600">Comm.</th><th className="p-3 font-semibold text-emerald-600">Net Sale</th><th className="p-3 font-semibold text-red-600">Exp</th><th className="p-3 font-black">Net P&L</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {stats.monthlyReport.length > 0 ? stats.monthlyReport.map((m) => (
+                                    <tr key={m.month} className={`hover:bg-gray-50 text-sm ${m.month === dashboardMonth ? 'bg-emerald-50' : ''}`}>
+                                      <td className="p-3 font-bold text-gray-800">{getMonthName(m.month)}</td>
+                                      <td className="p-3 font-medium text-gray-600">₹{m.grossSale.toLocaleString()}</td>
+                                      <td className="p-3 font-medium text-orange-600">₹{m.commission.toLocaleString()}</td>
+                                      <td className="p-3 font-bold text-emerald-600">₹{m.netSale.toLocaleString()}</td>
+                                      <td className="p-3 font-medium text-red-600">₹{m.expenses.toLocaleString()}</td>
+                                      <td className={`p-3 font-black ${m.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{m.netProfit >= 0 ? '+' : '-'}₹{Math.abs(m.netProfit).toLocaleString()}</td>
+                                    </tr>
+                                  )) : <tr><td colSpan="6" className="p-6 text-center text-gray-500">No data available</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 border-b pb-2 flex items-center"><i className="fa-regular fa-calendar mr-2 text-orange-600"></i> Day-Wise Sales ({getMonthName(dashboardMonth)})</h3>
+                           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                              <table className="w-full text-left border-collapse min-w-max">
+                                <thead className="sticky top-0 bg-orange-50 z-10">
+                                  <tr className="text-orange-900 text-xs uppercase tracking-wider"><th className="p-3 font-bold">Date</th><th className="p-3 font-semibold">Total Qty</th><th className="p-3 font-semibold">Comm.</th><th className="p-3 font-bold text-emerald-600">Gross Value</th><th className="p-3 font-bold text-blue-600">Net Sale</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {stats.filteredDayWiseSales.length > 0 ? stats.filteredDayWiseSales.map((d) => (
+                                    <tr key={d.date} className="hover:bg-gray-50 text-sm">
+                                      <td className="p-3 font-bold text-gray-800">{formatDate(d.date)}</td>
+                                      <td className="p-3 font-medium">{d.qty} pcs</td>
+                                      <td className="p-3 text-orange-600">₹{d.commission.toLocaleString()}</td>
+                                      <td className="p-3 font-bold text-emerald-600">₹{d.value.toLocaleString()}</td>
+                                      <td className="p-3 font-bold text-blue-600">₹{d.netSale.toLocaleString()}</td>
+                                    </tr>
+                                  )) : <tr><td colSpan="5" className="p-6 text-center text-gray-500">No sales recorded in this month</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-emerald-800 to-emerald-600 rounded-2xl shadow-sm p-6 text-white mt-8 relative overflow-hidden" data-html2canvas-ignore>
+                        <div className="absolute -right-10 -top-10 text-emerald-500/30"><i className="fa-solid fa-wand-magic-sparkles text-9xl"></i></div>
+                        <div className="relative z-10 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold mb-2 flex items-center"><i className="fa-solid fa-wand-magic-sparkles text-yellow-300 mr-2"></i> AI System Analyst</h3>
+                            {aiInsights ? <div className="bg-white/10 p-4 rounded-xl border border-white/20 whitespace-pre-wrap text-emerald-50 text-sm">{aiInsights}</div> : <p className="text-emerald-100 text-sm">Get smart advice based on {getMonthName(dashboardMonth)}'s targets and sales velocity.</p>}
+                          </div>
+                          <button onClick={handleGenerateInsights} disabled={isGeneratingInsights} className="whitespace-nowrap bg-white text-emerald-800 font-bold py-3 px-6 rounded-xl shadow hover:bg-emerald-50 transition flex items-center disabled:opacity-70 w-full sm:w-auto justify-center">
+                            {isGeneratingInsights ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-arrow-trend-up mr-2"></i>} Analyze {getMonthName(dashboardMonth)} ✨
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CUSTOM REPORTS (NEW TAB) */}
+                  {activeTab === 'reports' && (() => {
+                      const filteredSales = sales.filter(s => s.date >= reportFromDate && s.date <= reportToDate).sort((a,b) => b.date.localeCompare(a.date));
+                      const filteredExpenses = expenses.filter(e => e.date >= reportFromDate && e.date <= reportToDate);
+                      const rangeGrossSale = filteredSales.reduce((sum, s) => sum + s.saleValue, 0);
+                      const rangeTotalQty = filteredSales.reduce((sum, s) => sum + s.soldQty, 0);
+                      const rangeTotalExp = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+          
+                      const handleDownloadRangePDF = () => {
+                          setIsPdfGenerating(true);
+                          const element = document.getElementById('range-report-content');
+                          const opt = { margin: 0.4, filename: `COCOFUZ_Report_${reportFromDate}_to_${reportToDate}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+                          html2pdf().set(opt).from(element).save().then(() => setIsPdfGenerating(false));
+                      };
+          
+                      return (
+                          <div className="space-y-6 animate-fade-in">
+                              <header className="mb-6 flex flex-col md:flex-row justify-between md:items-end gap-4">
+                                  <div>
+                                      <h2 className="text-3xl font-bold text-gray-800">Custom Reports</h2>
+                                      <p className="text-gray-500">Filter and download data by specific dates</p>
+                                  </div>
+                              </header>
+                              
+                              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row gap-4 items-center mb-6">
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                                      <label className="text-sm font-bold text-gray-600">From:</label>
+                                      <input type="date" value={reportFromDate} onChange={e => setReportFromDate(e.target.value)} className="border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none w-full sm:w-auto" />
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                                      <label className="text-sm font-bold text-gray-600">To:</label>
+                                      <input type="date" value={reportToDate} onChange={e => setReportToDate(e.target.value)} className="border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none w-full sm:w-auto" />
+                                  </div>
+                                  <button onClick={handleDownloadRangePDF} disabled={isPdfGenerating} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-5 rounded-xl shadow-md transition ml-auto flex items-center justify-center">
+                                      {isPdfGenerating ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-file-pdf mr-2"></i>} 
+                                      Download PDF
+                                  </button>
+                              </div>
+          
+                              <div id="range-report-content" className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                  <div className="text-center mb-6">
+                                      <h2 className="text-2xl font-black text-emerald-800">COCOFUZ Sales Report</h2>
+                                      <p className="text-gray-500 font-medium">{formatDate(reportFromDate)} to {formatDate(reportToDate)}</p>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                                      <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
+                                          <p className="text-xs font-bold text-emerald-600 uppercase">Total Sold Qty</p>
+                                          <h3 className="text-2xl font-black text-emerald-900">{rangeTotalQty} pcs</h3>
+                                      </div>
+                                      <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
+                                          <p className="text-xs font-bold text-blue-600 uppercase">Gross Revenue</p>
+                                          <h3 className="text-2xl font-black text-blue-900">₹{rangeGrossSale.toLocaleString()}</h3>
+                                      </div>
+                                      <div className="bg-red-50 p-4 rounded-xl border border-red-100 text-center">
+                                          <p className="text-xs font-bold text-red-600 uppercase">Total Expenses</p>
+                                          <h3 className="text-2xl font-black text-red-900">₹{rangeTotalExp.toLocaleString()}</h3>
+                                      </div>
+                                  </div>
+          
+                                  <h3 className="text-md font-bold text-gray-800 mb-3 border-b pb-2">Sales Breakdown</h3>
+                                  <div className="overflow-x-auto">
+                                      <table className="w-full text-left border-collapse min-w-max">
+                                          <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                                              <tr><th className="p-3">Date</th><th className="p-3">Sold Qty</th><th className="p-3">Commission</th><th className="p-3">Gross Value</th></tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-gray-100">
+                                              {filteredSales.map(s => (
+                                                  <tr key={s.id} className="text-sm">
+                                                      <td className="p-3 font-medium">{formatDate(s.date)}</td>
+                                                      <td className="p-3 font-bold text-emerald-600">{s.soldQty} pcs</td>
+                                                      <td className="p-3 text-orange-600">₹{s.commission || 0}</td>
+                                                      <td className="p-3 font-bold text-blue-600">₹{s.saleValue.toLocaleString()}</td>
+                                                  </tr>
+                                              ))}
+                                              {filteredSales.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-gray-500">No sales in this date range.</td></tr>}
+                                          </tbody>
+                                      </table>
+                                  </div>
+                              </div>
+                          </div>
+                      );
+                  })()}
+
+                  {/* SUPPLY & PRODUCTION */}
+                  {activeTab === 'supply' && (
+                    <div className="space-y-6 animate-fade-in">
+                       <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                        <div><h2 className="text-3xl font-bold text-gray-800">Supply & Production</h2><p className="text-gray-500">Manage Godown Purchases & Production/Peeling</p></div>
+                      </header>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                           <p className="text-xs font-bold text-blue-500 uppercase tracking-widest mb-1">Godown Stock</p>
+                           <h3 className="text-2xl font-black text-blue-800">{stats.godownStock} <span className="text-sm font-medium">pcs</span></h3>
+                        </div>
+                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                           <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-1">Total Transport</p>
+                           <h3 className="text-2xl font-black text-orange-800">₹{stats.totalGodownTransportCost.toLocaleString()}</h3>
+                        </div>
+                        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                           <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-1">Total Purchase Cost</p>
+                           <h3 className="text-2xl font-black text-emerald-800">₹{stats.totalStockCost.toLocaleString()}</h3>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center"><i className="fa-solid fa-truck-field mr-2 text-blue-600"></i> Add Purchase Record</h3>
+                            <form onSubmit={handleAddPurchase} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label><input type="text" name="supplier" required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Qty</label><input type="number" name="quantity" required min="1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Rate (₹)</label><input type="number" name="rate" required min="1" step="0.1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Transport (₹)</label><input type="number" name="transportCost" min="0" defaultValue="0" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                              </div>
+                              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition shadow-md shadow-blue-200">Save to Godown</button>
+                            </form>
+                          </div>
+                          
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center"><i className="fa-solid fa-industry mr-2 text-purple-600"></i> Log Production/Peeling</h3>
+                            <form onSubmit={handleAddProduction} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Raw Coconut</label><input type="number" name="raw" required min="1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 outline-none" /></div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Peeled Produced</label><input type="number" name="peeled" required min="0" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Waste (Spoiled)</label><input type="number" name="waste" min="0" defaultValue="0" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 outline-none" /></div>
+                              </div>
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label><input type="text" name="notes" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 outline-none" /></div>
+                              <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition shadow-md shadow-purple-200">Log Production</button>
+                            </form>
+                          </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col lg:col-span-2">
+                            <h4 className="p-4 bg-blue-50 border-b border-blue-100 font-bold text-blue-900 uppercase text-xs tracking-widest"><i className="fa-solid fa-list-ul mr-2"></i> Raw Purchases</h4>
+                            <div className="flex-1 max-h-64 overflow-x-auto overflow-y-auto">
+                              <table className="w-full text-left border-collapse min-w-max">
+                                <thead className="bg-gray-50 sticky top-0 shadow-sm text-xs text-gray-500 uppercase tracking-wider">
+                                  <tr>
+                                      <th className="p-3">Date</th><th className="p-3">Supplier</th><th className="p-3">Qty</th><th className="p-3">Rate</th>
+                                      <th className="p-3 text-orange-600">Transport</th><th className="p-3 font-bold text-blue-600">Total Cost</th>
+                                      <th className="p-3 text-emerald-600">Landing/Pc</th><th className="p-3 text-right">Del</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {purchases.map(p => (
+                                    <tr key={p.id} className="hover:bg-gray-50 text-sm">
+                                      <td className="p-3 font-medium">{formatDate(p.date)}</td><td className="p-3">{p.supplier}</td>
+                                      <td className="p-3 font-bold text-gray-800">{p.quantity}</td><td className="p-3 text-gray-600">₹{p.rate}</td>
+                                      <td className="p-3 font-medium text-orange-600">₹{p.transportCost}</td><td className="p-3 font-bold text-blue-600">₹{p.totalCost?.toLocaleString()}</td>
+                                      <td className="p-3 font-bold text-emerald-600">₹{p.landingPrice}</td>
+                                      <td className="p-3 text-right"><button onClick={() => deleteFromCloud("purchases", p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button></td>
+                                    </tr>
+                                  ))}
+                                  {purchases.length === 0 && <tr><td colSpan="8" className="p-4 text-center text-gray-500 text-sm">No purchases added</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col lg:col-span-2">
+                            <h4 className="p-4 bg-purple-50 border-b border-purple-100 font-bold text-purple-900 uppercase text-xs tracking-widest"><i className="fa-solid fa-list-ul mr-2"></i> Raw Production Entries</h4>
+                            <div className="flex-1 max-h-64 overflow-x-auto overflow-y-auto">
+                              <table className="w-full text-left border-collapse min-w-max">
+                                <thead className="bg-gray-50 sticky top-0 shadow-sm text-xs text-gray-500 uppercase">
+                                  <tr><th className="p-3">Date</th><th className="p-3 text-gray-700">Raw</th><th className="p-3 text-emerald-600">Peeled</th><th className="p-3 text-red-500">Waste</th><th className="p-3 text-right">Del</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {production.map(p => (
+                                    <tr key={p.id} className="hover:bg-gray-50 text-sm">
+                                      <td className="p-3 font-medium">{formatDate(p.date)}</td><td className="p-3 font-bold text-gray-700">{p.raw}</td><td className="p-3 font-bold text-emerald-600">{p.peeled}</td><td className="p-3 font-bold text-red-500">{p.waste}</td>
+                                      <td className="p-3 text-right"><button onClick={() => deleteFromCloud("production", p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button></td>
+                                    </tr>
+                                  ))}
+                                  {production.length === 0 && <tr><td colSpan="5" className="p-4 text-center text-gray-500 text-sm">No production added</td></tr>}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-blue-50 p-6 rounded-2xl shadow-sm border border-blue-200 mt-6">
+                         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                           <div>
+                             <h3 className="text-lg font-bold text-blue-900 flex items-center"><i className="fa-solid fa-wand-magic-sparkles mr-2 text-blue-500"></i> AI Supplier Negotiator</h3>
+                             <p className="text-sm text-blue-700">Draft a WhatsApp negotiation based on your latest purchase.</p>
+                           </div>
+                           <button onClick={handleGenerateNegotiation} disabled={isGeneratingNegotiation} className="w-full sm:w-auto bg-white text-blue-700 font-bold py-2 px-4 rounded-xl shadow hover:bg-blue-100 transition whitespace-nowrap justify-center flex items-center">
+                             {isGeneratingNegotiation ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : '✨ '} Draft Message
+                           </button>
+                         </div>
+                         {negotiationDraft && <div className="bg-white p-4 mt-4 rounded-xl border border-blue-200 text-sm whitespace-pre-wrap">{negotiationDraft}</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STORE OPERATIONS */}
+                  {activeTab === 'operations' && (
+                    <div className="space-y-6 animate-fade-in">
+                       <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                        <div><h2 className="text-3xl font-bold text-gray-800">Store Operations</h2><p className="text-gray-500">Manage Store Transfers & Daily Sales</p></div>
+                        <div className="bg-orange-100 text-orange-800 px-4 py-2 rounded-lg font-bold flex items-center w-fit"><i className="fa-solid fa-box mr-2"></i> Store Stock: {stats.storeStock} pcs</div>
+                      </header>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center text-blue-700"><i className="fa-solid fa-truck mr-2"></i> Transfer to Store</h3>
+                          <form onSubmit={handleAddTransfer} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Qty to Send</label><input type="number" name="quantity" required min="1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Destination</label><input type="text" name="destination" defaultValue="Airport Stall" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Transport Cost (₹)</label><input type="number" name="transportCost" defaultValue="0" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                            </div>
+                            <button type="submit" className="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded-lg border border-blue-300 transition shadow-sm">Log Transfer</button>
+                          </form>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center text-emerald-700"><i className="fa-solid fa-cart-shopping mr-2"></i> Log Sale Entry</h3>
+                          <form onSubmit={handleAddSale} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" value={saleEntry.date} onChange={handleSaleInputChange} required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Sold Qty</label><input type="number" name="soldQty" value={saleEntry.soldQty} onChange={handleSaleQtyChange} required min="1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="e.g. 10" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Gross Sale (₹)</label><input type="number" name="saleValue" value={saleEntry.saleValue} onChange={handleSaleInputChange} required min="1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none bg-gray-50" /></div>
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Commission (₹)</label><input type="number" name="commission" value={saleEntry.commission} onChange={handleSaleInputChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-orange-500 outline-none bg-gray-50" /></div>
+                            </div>
+                            <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition shadow-md shadow-emerald-200">Record Daily Sales</button>
+                          </form>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                              <h4 className="p-4 bg-blue-50 border-b border-blue-100 font-bold text-blue-900 uppercase text-xs tracking-widest"><i className="fa-solid fa-list-ul mr-2"></i> Raw Transfer Entries</h4>
+                              <div className="flex-1 max-h-64 overflow-x-auto overflow-y-auto">
+                                <table className="w-full text-left border-collapse min-w-max">
+                                    <thead className="bg-gray-50 sticky top-0 shadow-sm text-xs text-gray-500 uppercase">
+                                        <tr><th className="p-3">Date</th><th className="p-3">Qty</th><th className="p-3">Transport</th><th className="p-3 text-right">Del</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {transfers.map(t => (
+                                            <tr key={t.id} className="hover:bg-gray-50 text-sm">
+                                                <td className="p-3 font-medium">{formatDate(t.date)}</td>
+                                                <td className="p-3 font-bold text-blue-600">{t.quantity} pcs</td>
+                                                <td className="p-3">₹{t.transportCost}</td>
+                                                <td className="p-3 text-right"><button onClick={() => deleteFromCloud("transfers", t.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button></td>
+                                            </tr>
+                                        ))}
+                                        {transfers.length === 0 && <tr><td colSpan="4" className="p-4 text-center text-gray-500 text-sm">No transfers recorded</td></tr>}
+                                    </tbody>
+                                </table>
+                              </div>
+                          </div>
+
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                              <h4 className="p-4 bg-emerald-50 border-b border-emerald-100 font-bold text-emerald-900 uppercase text-xs tracking-widest"><i className="fa-solid fa-list-ul mr-2"></i> Raw Sale Entries</h4>
+                              <div className="flex-1 max-h-64 overflow-x-auto overflow-y-auto">
+                                  <table className="w-full text-left border-collapse min-w-max">
+                                      <thead className="bg-gray-50 sticky top-0 shadow-sm text-xs text-gray-500 uppercase">
+                                          <tr><th className="p-3">Date</th><th className="p-3">Qty</th><th className="p-3">Gross/Comm</th><th className="p-3 text-right">Del</th></tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100">
+                                          {sales.map(s => (
+                                              <tr key={s.id} className="hover:bg-gray-50 text-sm">
+                                                  <td className="p-3 font-medium">{formatDate(s.date)}</td>
+                                                  <td className="p-3 font-bold text-emerald-600">{s.soldQty} pcs</td>
+                                                  <td className="p-3">
+                                                      <span className="font-bold text-emerald-700">₹{s.saleValue}</span><br/>
+                                                      <span className="text-xs text-orange-500">₹{s.commission || 0}</span>
+                                                  </td>
+                                                  <td className="p-3 text-right"><button onClick={() => deleteFromCloud("sales", s.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button></td>
+                                              </tr>
+                                          ))}
+                                          {sales.length === 0 && <tr><td colSpan="4" className="p-4 text-center text-gray-500 text-sm">No sales recorded</td></tr>}
+                                      </tbody>
+                                  </table>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-purple-50 p-6 rounded-2xl shadow-sm border border-purple-200 mt-6">
+                         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                           <div>
+                             <h3 className="text-lg font-bold text-purple-900 flex items-center"><i className="fa-solid fa-wand-magic-sparkles mr-2 text-purple-500"></i> AI Sales Coach</h3>
+                             <p className="text-sm text-purple-700">Get instant upselling techniques or bundle ideas to boost today's sales volume.</p>
+                           </div>
+                           <button onClick={handleGenerateSalesCoach} disabled={isGeneratingSalesCoach} className="w-full sm:w-auto bg-white text-purple-700 font-bold py-2 px-4 rounded-xl shadow border border-purple-200 hover:bg-purple-100 transition whitespace-nowrap justify-center flex items-center">
+                             {isGeneratingSalesCoach ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : '✨ '} Get Sales Tips
+                           </button>
+                         </div>
+                         {salesCoachTip && <div className="bg-white p-4 mt-4 rounded-xl border border-purple-200 text-sm whitespace-pre-wrap">{salesCoachTip}</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FINANCE & ASSETS */}
+                  {activeTab === 'finance' && (
+                    <div className="space-y-6 animate-fade-in">
+                       <header><h2 className="text-3xl font-bold text-gray-800">Finance & Assets</h2><p className="text-gray-500">Track Operating Expenses, Physical Assets, and Pending Payments</p></header>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center text-red-600"><i className="fa-solid fa-receipt mr-2"></i> Log Daily Expense</h3>
+                            <form onSubmit={handleAddExpense} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 outline-none" /></div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                                  <select name="category" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 outline-none">
+                                    <option value="ROOM RENT">ROOM RENT</option><option value="STOCK">STOCK / MATERIAL</option><option value="TRANSPORTATION">TRANSPORTATION</option><option value="MISLLENSES">MISLLENSES</option>
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label><input type="number" name="amount" required min="1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Notes</label><input type="text" name="notes" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 outline-none" /></div>
+                              </div>
+                              <button type="submit" className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition shadow-md">Save Expense</button>
+                            </form>
+                          </div>
+
+                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center text-teal-600"><i className="fa-solid fa-file-invoice-dollar mr-2"></i> Payment Tracking (B2B/Dues)</h3>
+                            <form onSubmit={handleAddPayment} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label><input type="date" name="date" value={paymentEntry.date} onChange={handlePaymentInputChange} required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-teal-500 outline-none" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">For Month</label><input type="month" name="month" value={paymentEntry.month} onChange={handlePaymentInputChange} required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-teal-500 outline-none" /></div>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Sale Qty</label><input type="number" name="saleQty" value={paymentEntry.saleQty} onChange={handlePaymentQtyChange} required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. 500" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Total (₹)</label><input type="number" name="totalAmount" value={paymentEntry.totalAmount} onChange={handlePaymentInputChange} required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-teal-500 outline-none bg-gray-50" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Net Sale</label><input type="number" name="netSale" value={paymentEntry.netSale} onChange={handlePaymentInputChange} required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-teal-500 outline-none bg-gray-50" /></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Received</label><input type="number" name="receivedAmount" value={paymentEntry.receivedAmount} onChange={handlePaymentInputChange} required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-teal-500 outline-none" /></div>
+                              </div>
+                              <div><label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label><input type="text" name="notes" value={paymentEntry.notes} onChange={handlePaymentInputChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-teal-500 outline-none" /></div>
+                              <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition shadow-md">Log Payment Status</button>
+                            </form>
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mt-6">
+                         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center text-indigo-600"><i className="fa-solid fa-chair mr-2"></i> Register New Physical Asset</h3>
+                         <form onSubmit={handleAddAsset} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 items-end">
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label><input type="date" name="date" required className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label><input type="text" name="name" required placeholder="e.g. Sharp Knives" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Cost (₹)</label><input type="number" name="cost" required min="1" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label><input type="text" name="supplier" className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                            <div className="sm:col-span-2 md:col-span-1"><button type="submit" className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition shadow-md">Register Asset</button></div>
+                         </form>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-6 mt-6">
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                              <h4 className="p-4 bg-teal-50 border-b border-teal-100 font-bold text-teal-900 uppercase text-xs tracking-widest"><i className="fa-solid fa-list-ul mr-2"></i> Payment Tracking History</h4>
+                              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                                  <table className="w-full text-left border-collapse min-w-max">
+                                      <thead className="bg-gray-50 sticky top-0 shadow-sm text-xs text-gray-500 uppercase">
+                                          <tr><th className="p-3">Month</th><th className="p-3">Date</th><th className="p-3">Qty</th><th className="p-3">Total</th><th className="p-3 text-blue-600">Net Sale</th><th className="p-3 text-emerald-600">Received</th><th className="p-3 text-red-500">Pending</th><th className="p-3 text-right">Del</th></tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100">
+                                          {payments.map(p => (
+                                              <tr key={p.id} className="hover:bg-gray-50 text-sm">
+                                                  <td className="p-3 font-bold">{p.month}</td>
+                                                  <td className="p-3 text-gray-600">{formatDate(p.date)}</td>
+                                                  <td className="p-3 font-medium text-gray-800">{p.saleQty} pcs</td>
+                                                  <td className="p-3 font-medium text-gray-800">₹{p.totalAmount?.toLocaleString()}</td>
+                                                  <td className="p-3 font-bold text-blue-600">₹{p.netSale ? p.netSale.toLocaleString() : (p.totalAmount * 0.75).toLocaleString()}</td>
+                                                  <td className="p-3 font-bold text-emerald-600">₹{p.receivedAmount?.toLocaleString()}</td>
+                                                  <td className="p-3 font-bold text-red-500">₹{p.pendingAmount?.toLocaleString()}</td>
+                                                  <td className="p-3 text-right"><button onClick={() => deleteFromCloud("payments", p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button></td>
+                                              </tr>
+                                          ))}
+                                          {payments.length === 0 && <tr><td colSpan="8" className="p-4 text-center text-gray-500 text-sm">No payment records added</td></tr>}
+                                      </tbody>
+                                  </table>
+                              </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                                <h4 className="p-4 bg-red-50 border-b border-red-100 font-bold text-red-900 uppercase text-xs tracking-widest"><i className="fa-solid fa-list-ul mr-2"></i> Operating Expenses</h4>
+                                <div className="flex-1 max-h-64 overflow-x-auto overflow-y-auto">
+                                    <table className="w-full text-left border-collapse min-w-max">
+                                        <thead className="bg-gray-50 sticky top-0 shadow-sm text-xs text-gray-500 uppercase"><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Amount</th><th className="p-3 text-right">Del</th></tr></thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                          {expenses.map(e => (
+                                              <tr key={e.id} className="hover:bg-gray-50 text-sm">
+                                                <td className="p-3 text-gray-600">{formatDate(e.date)}</td><td className="p-3 font-medium">{e.category}</td><td className="p-3 font-bold text-red-600">₹{e.amount}</td>
+                                                <td className="p-3 text-right"><button onClick={() => deleteFromCloud("expenses", e.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button></td>
+                                              </tr>
+                                          ))}
+                                          {expenses.length === 0 && <tr><td colSpan="4" className="p-4 text-center text-gray-500 text-sm">No expenses</td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                                <h4 className="p-4 bg-indigo-50 border-b border-indigo-100 font-bold text-indigo-900 uppercase text-xs tracking-widest"><i className="fa-solid fa-list-ul mr-2"></i> Physical Assets</h4>
+                                <div className="flex-1 max-h-64 overflow-x-auto overflow-y-auto">
+                                    <table className="w-full text-left border-collapse min-w-max">
+                                        <thead className="bg-gray-50 sticky top-0 shadow-sm text-xs text-gray-500 uppercase"><tr><th className="p-3">Date</th><th className="p-3">Item</th><th className="p-3">Cost</th><th className="p-3 text-right">Del</th></tr></thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                          {assets.map(a => (
+                                              <tr key={a.id} className="hover:bg-gray-50 text-sm">
+                                                <td className="p-3 text-gray-600">{formatDate(a.date)}</td><td className="p-3 font-medium text-indigo-800">{a.name}</td><td className="p-3 font-bold text-indigo-600">₹{a.cost}</td>
+                                                <td className="p-3 text-right"><button onClick={() => deleteFromCloud("assets", a.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button></td>
+                                              </tr>
+                                          ))}
+                                          {assets.length === 0 && <tr><td colSpan="4" className="p-4 text-center text-gray-500 text-sm">No assets registered</td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-200 mt-6">
+                             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                               <div>
+                                 <h3 className="text-lg font-bold text-red-900 flex items-center"><i className="fa-solid fa-wand-magic-sparkles mr-2 text-red-500"></i> AI Expense Auditor</h3>
+                                 <p className="text-sm text-red-700">Analyze spending and suggest ways to cut costs.</p>
+                               </div>
+                               <button onClick={handleAuditExpenses} disabled={isGeneratingAudit} className="w-full sm:w-auto bg-white text-red-700 font-bold py-2 px-4 rounded-xl shadow border border-red-200 hover:bg-red-100 transition whitespace-nowrap justify-center flex items-center">
+                                 {isGeneratingAudit ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : '✨ '} Audit Expenses
+                               </button>
+                             </div>
+                             {expenseAudit && <div className="bg-white p-4 mt-4 rounded-xl border border-red-200 text-sm whitespace-pre-wrap">{expenseAudit}</div>}
+                          </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI MARKETING VIEW */}
+                  {activeTab === 'marketing' && (
+                    <div className="space-y-6 animate-fade-in">
+                       <header><h2 className="text-3xl font-bold text-gray-800 flex items-center"><i className="fa-solid fa-wand-magic-sparkles text-emerald-500 mr-3"></i> AI Marketing Hub</h2></header>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                          <h3 className="text-lg font-bold text-gray-800 mb-4">What do you want to promote?</h3>
+                          <form onSubmit={handleGenerateMarketing} className="space-y-4">
+                            <textarea name="topic" rows="4" required className="w-full border border-gray-300 rounded-lg p-3 outline-none resize-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g., 'Fresh stock just arrived!'"></textarea>
+                            <button type="submit" disabled={isGeneratingCopy} className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-3 px-4 rounded-xl flex justify-center items-center shadow-md disabled:opacity-70">
+                              {isGeneratingCopy ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-wand-magic-sparkles mr-2"></i>} Generate Post
+                            </button>
+                          </form>
+                        </div>
+
+                        <div className="bg-emerald-50 p-6 rounded-2xl shadow-sm border border-emerald-200 flex flex-col">
+                          <h3 className="text-lg font-bold text-emerald-900 mb-4 flex items-center"><i className="fa-solid fa-comment mr-2"></i> Generated Copy</h3>
+                          <div className="flex-1 bg-white rounded-xl border border-emerald-100 p-4 overflow-y-auto">
+                            {marketingCopy ? <div className="text-gray-700 whitespace-pre-wrap font-medium">{marketingCopy}</div> : <div className="h-full flex flex-col items-center justify-center text-emerald-400 text-center py-6"><i className="fa-solid fa-wand-magic-sparkles text-4xl opacity-50 mb-3"></i><p className="text-sm">Post will appear here.</p></div>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-amber-50 p-6 rounded-2xl shadow-sm border border-amber-200 mt-6">
+                         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                           <div>
+                             <h3 className="text-lg font-bold text-amber-900 flex items-center"><i className="fa-solid fa-wand-magic-sparkles mr-2 text-amber-500"></i> AI Chalkboard Hook Generator</h3>
+                             <p className="text-sm text-amber-700">Need something catchy to write on your physical stall's display board today to attract walk-ins?</p>
+                           </div>
+                           <button onClick={handleGenerateChalkboard} disabled={isGeneratingChalkboard} className="w-full sm:w-auto bg-white text-amber-700 font-bold py-2 px-4 rounded-xl shadow border border-amber-200 hover:bg-amber-100 transition whitespace-nowrap justify-center flex items-center">
+                             {isGeneratingChalkboard ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : '✨ '} Generate Hook
+                           </button>
+                         </div>
+                         {chalkboardHook && (
+                             <div className="bg-white p-6 mt-4 rounded-xl border border-amber-200 text-center relative">
+                                  <p className="font-black text-3xl text-gray-800 tracking-tight" style={{fontFamily: 'cursive'}}>{chalkboardHook}</p>
+                             </div>
+                         )}
+                      </div>
+                    </div>
+                  )}
+
+                </main>
+              </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+</body>
+</html>
+
